@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Simulação IoT - Sensores com LEDs e Potenciômetro</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f5f5f5; text-align: center; padding: 30px; }
+    .card { background: white; padding: 20px; margin: 15px auto; width: 380px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .led { display: inline-block; width: 30px; height: 30px; border-radius: 50%; background: gray; margin-left: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.2); }
+    button { padding: 10px 20px; border: none; background: #007BFF; color: white; border-radius: 8px; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    input[type=range] { width: 80%; margin: 15px; }
+  </style>
+</head>
+<body>
+  <h1>Monitoramento IoT</h1>
+
+  
+  <!-- Cada card é uma “caixinha” na tela pra mostrar os dados de um sensor:-->
+  <div class="card">
+    <h2>Potenciômetro (Sensibilidade)</h2>
+    <input type="range" id="pot" min="0" max="100" value="50" oninput="mostrarValor(this.value)">
+    <p>Sensibilidade: <span id="valorPot">50</span></p>
+  </div>
+
+  <!--azul= frio dms / verde= dentro da faixa ajustada / vermelho= quente dms-->
+  <div class="card">
+    <h2>DHT11 (Temperatura/Umidade)</h2>
+    <p>Temperatura: <span id="temp">--</span> °C <span id="ledTemp" class="led"></span></p>
+    <p>Umidade: <span id="umid">--</span> %</p>
+  </div>
+
+  <!--só mostra algum movimento detectado se o sensor detectar e sensibilidade for maior que 30-->
+  <div class="card">
+    <h2>Sensor de Movimento</h2>
+    <p>Status: <span id="movimento">--</span> <span id="ledMov" class="led"></span></p>
+  </div>
+
+  <!--led vermelho= perto dms / verde= distancia segura-->
+  <div class="card">
+    <h2>Sensor de Proximidade</h2>
+    <p>Distância: <span id="dist">--</span> cm <span id="ledDist" class="led"></span></p>
+  </div>
+
+  <button onclick="atualizar()">Atualizar</button>
+
+  <script>
+    let sensibilidade = 50;
+
+    function mostrarValor(val) {
+      sensibilidade = parseInt(val);
+      document.getElementById("valorPot").innerText = val;
+    }
+
+    function setLedColor(id, color) {
+      document.getElementById(id).style.background = color;
+      document.getElementById(id).style.boxShadow = `0 0 15px ${color}`;
+    }
+
+    async function atualizar() {
+      const response = await fetch("/dados");
+      const data = await response.json();
+
+      // DHT11
+      const temp = data.dht11.temperatura;
+      document.getElementById("temp").innerText = temp;
+      document.getElementById("umid").innerText = data.dht11.umidade;
+
+      // Faixas ajustadas pela sensibilidade
+      if (temp < (20 - sensibilidade/10)) setLedColor("ledTemp", "blue");
+      else if (temp <= (25 + sensibilidade/10)) setLedColor("ledTemp", "green");
+      else setLedColor("ledTemp", "red");
+
+      //Movimento= sensibilidade controla "tolerância"
+      if (data.movimento.movimento && sensibilidade > 30) {
+        document.getElementById("movimento").innerText = "Movimento detectado";
+        setLedColor("ledMov", "yellow");
+      } else {
+        document.getElementById("movimento").innerText = "Sem movimento";
+        setLedColor("ledMov", "gray");
+      }
+
+      //Proximidade threshold ajustado pelo potenciômetro
+      const dist = data.proximidade.distancia;
+      document.getElementById("dist").innerText = dist;
+
+      if (dist < sensibilidade) setLedColor("ledDist", "red");
+      else setLedColor("ledDist", "green");
+    }
+
+    setInterval(atualizar, 3000);
+    atualizar();
+  </script>
+</body>
+</html>
